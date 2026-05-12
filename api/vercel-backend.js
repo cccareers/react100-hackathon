@@ -282,3 +282,5 @@ app.get('/api/scrape', async (req, res) =>
         }
     }
 });
+
+export default app;
