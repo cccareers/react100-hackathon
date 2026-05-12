@@ -64,24 +64,14 @@ const cleanScrapedTitle = (title) =>
 
 async function getBrowserInstance()
 {
-    // If we are on Vercel, use the light chromium binary
-    if (process.env.VERCEL)
-    {
+    // On Vercel, use the light chromium binary
         return await puppeteer.launch({
-            args: chromium.args,
+            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
+            ignoreHTTPSErrors: true,
         });
-    }
-
-    // If we are on your local machine, use your local Chrome
-return await puppeteer.launch({
-        headless: "new",
-        args: ['--no-sandbox'],
-        // Standard path for Google Chrome on Windows:
-        executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
-    });
 }
 
 async function initBrowser()
@@ -171,121 +161,60 @@ const setTitlesCache = async (url, title) =>
 };
 
 // --- THE SCRAPER ---
-app.get('/api/scrape', async (req, res) =>
-{
+app.get('/api/scrape', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
-    let extractedTitle = null;
+    let browserInstance = null;
+    let page = null;
 
-    // --- FAST PATH: URL PARSING ---
-    if (url.includes('hulu.com/movie/'))
-    {
-        const slug = url.split('/movie/')[1];
-        const parts = slug.split('-');
-        extractedTitle = parts.slice(0, -5).join(' ');
-    }
-    else if (url.includes('tv.apple.com/') && url.includes('/movie/'))
-    {
-        // Split by /movie/, take the second part, then split by / to get the title slug
-        const slug = url.split('/movie/')[1].split('/')[0];
-        extractedTitle = slug.replace(/-/g, ' ');
-    }
-    else if (url.includes('crunchyroll.com/series/'))
-    {
-        // Example: /series/GZJH3DPK0/blade-runner-black-lotus
-        const parts = url.split('/series/')[1].split('/');
-        // parts[0] is the ID (GZJH3DPK0), parts[1] is the title slug
-        if (parts[1])
-        {
-            extractedTitle = parts[1].replace(/-/g, ' ');
-        } else
-        {
-            // Sometimes URLs don't have the slug at the end, just the ID
-            // In this case, we'll let it fall through to Puppeteer
-            extractedTitle = null;
-        }
-    }
+    try {
+        // 1. Check Cache first (Always!)
+        const cached = await getTitlesCache(url);
+        if (cached) return res.json({ title: cached, source: 'cache' });
 
-    // --- FORMAT & RETURN IF SUCCESSFUL ---
-    if (extractedTitle)
-    {
-        const cleanTitle = decodeURIComponent(extractedTitle)
-            .replace(/-/g, ' ') // Standardize dashes to spaces
-            // This regex finds the first letter of every word, even after ( or [
-            .replace(/(^\w|\s\w|[\(\[]\w)/g, m => m.toUpperCase());
+        // 2. Launch Browser
+        browserInstance = await getBrowserInstance();
+        page = await browserInstance.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-        console.log('🚀 Fast Path Success:', cleanTitle);
-        return res.json({ title: cleanTitle, source: 'url-parse' });
-    }
-
-    // 1. Check Cache First
-    const cached = await getTitlesCache(url);
-    if (cached)
-    {
-        console.log('⚡ Cache Hit:', url);
-        return res.json({ title: cached, source: 'link-cache' });
-    }
-
-    console.log('🔍 Scraping with Puppeteer:', url);
-
-    let page;
-    try
-    {
-        // If browser is null or disconnected, launch it now
-        if (!browser || !browser.connected) {
-            console.log('🌐 Launching browser for this request...');
-            browser = await getBrowserInstance();
-        }
-        page = await browser.newPage();
-
-        // Optimizing headers to look more human
-        await page.setExtraHTTPHeaders({
-            'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8'
-        });
-
+        // 3. Block unnecessary junk to save time/memory
         await page.setRequestInterception(true);
-        page.on('request', (req) =>
-        {
-            if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType()))
-            {
+        page.on('request', (req) => {
+            if (['image', 'stylesheet', 'font', 'media', 'script'].includes(req.resourceType())) {
+                // We actually block scripts too if the title is in the HTML source
+                // This makes the page load INSTANTLY
                 req.abort();
-            } else
-            {
+            } else {
                 req.continue();
             }
         });
 
-        // We use 'networkidle2' because it's safer for dynamic titles (like version info)
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 20000 });
+        // 4. Navigate with a tight timeout
+        // 'domcontentloaded' is much faster than 'networkidle'
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 8000 });
 
-        const rawTitle = await page.evaluate(() =>
-        {
-            const h1 = document.querySelector('h1')?.innerText;
-            const og = document.querySelector('meta[property="og:title"]')?.content;
-            return h1 || og || document.title;
+        const rawTitle = await page.evaluate(() => {
+            // Amazon specific selector for the movie title
+            const amzTitle = document.querySelector('h1[data-automation-id="title"]')?.innerText;
+            const ogTitle = document.querySelector('meta[property="og:title"]')?.content;
+            return amzTitle || ogTitle || document.title;
         });
 
         const cleanTitle = cleanScrapedTitle(rawTitle);
 
-        if (cleanTitle && cleanTitle !== "Amazon.com")
-        {
-            setTitlesCache(url, cleanTitle);
+        if (cleanTitle && cleanTitle !== "Amazon.com") {
+            await setTitlesCache(url, cleanTitle);
         }
 
         res.json({ title: cleanTitle });
 
-    } catch (error)
-    {
-        console.error(`Error scraping ${url}:`, error);
-        browser = null;
-        res.status(500).json({ error: error.message });
-    } finally
-    {
-        if (page)
-        {
-            await page.close(); // THIS keeps your RAM clean!
-        }
+    } catch (error) {
+        console.error("Scrape Crash:", error.message);
+        res.status(500).json({ error: "Scrape failed", details: error.message });
+    } finally {
+        if (page) await page.close();
+        if (browserInstance) await browserInstance.close();
     }
 });
 
