@@ -14,7 +14,7 @@ let browser;
 //get api keys from .env
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 const rapidapiKey = process.env.VITE_STREAMING_AVAILABILITY_API_KEY;
-rapidapiKey ? console.log("Streaming Availability key is loaded " + rapidapiKey) : console.log("Failed Streaming Availability key loading");
+rapidapiKey ? console.log("Streaming Availability key is loaded") : console.log("Failed Streaming Availability key loading");
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri);
 

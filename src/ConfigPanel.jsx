@@ -16,7 +16,7 @@ function ConfigPanel({ userSubscriptions, handleSubscriptions, setRegion }) {
             &#9776;
           </button>
           <div className="region-div">
-            Primary Region:
+            Primary Region:  
             <select
               className="region-select"
               onChange={(e) => setRegion(e.target.value)}>

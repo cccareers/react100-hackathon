@@ -10,8 +10,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^148.0.0",
     "axios": "^1.16.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "got": "^15.0.5",
     "idb-keyval": "^6.2.2",
+    "metascraper": "^5.50.1",
+    "metascraper-description": "^5.50.1",
+    "metascraper-image": "^5.50.1",
+    "metascraper-title": "^5.50.1",
+    "mongodb": "^7.2.0",
+    "puppeteer": "^24.43.0",
+    "puppeteer-core": "^24.43.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
