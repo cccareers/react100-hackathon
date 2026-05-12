@@ -70,7 +70,7 @@ function App() {
   }
 
   async function getBackendStreamingData(type, id) {
-    const endpoint = `http://localhost:3001/api/streaming-info?media_type=${type}&tmdbId=${id}`;
+    const endpoint = `/api/streaming-info?media_type=${type}&tmdbId=${id}`;
 
     try {
       const response = await fetch(endpoint);
