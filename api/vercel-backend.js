@@ -219,37 +219,68 @@ app.get('/api/scrape', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
+    // 1. Check MongoDB Cache first
+    const cached = await getTitlesCache(url);
+    if (cached) return res.json({ title: cached, source: 'cache' });
+
+    // 2. FAST PATHS: URL Parsing (No Browser Needed)
+    let extractedTitle = null;
+
+    if (url.includes('hulu.com/movie/')) {
+        const slug = url.split('/movie/')[1];
+        extractedTitle = slug.split('-').slice(0, -5).join(' ');
+    } 
+    else if (url.includes('tv.apple.com/') && url.includes('/movie/')) {
+        extractedTitle = url.split('/movie/')[1].split('/')[0].replace(/-/g, ' ');
+    } 
+    else if (url.includes('crunchyroll.com/series/')) {
+        const parts = url.split('/series/')[1].split('/');
+        if (parts[1]) extractedTitle = parts[1].replace(/-/g, ' ');
+    }
+    // Amazon Fast Path (only works if slug is present before the ID)
+    else if (url.includes('amazon.com')) {
+        const parts = url.split('/detail/');
+        if (parts[1]) {
+            const slug = parts[1].split('/')[0];
+            // Check if slug looks like a title and not a random ID (IDs usually start with 0M or B0)
+            if (!slug.startsWith('0M') && !slug.startsWith('B0') && slug.includes('-')) {
+                extractedTitle = slug.replace(/-/g, ' ');
+            }
+        }
+    }
+
+    // If a Fast Path matched, format and return immediately
+    if (extractedTitle) {
+        const cleanTitle = decodeURIComponent(extractedTitle)
+            .replace(/(^\w|\s\w|[\(\[]\w)/g, m => m.toUpperCase());
+        
+        // Cache it for next time!
+        await setTitlesCache(url, cleanTitle);
+        return res.json({ title: cleanTitle, source: 'url-parse' });
+    }
+
+    // 3. SLOW PATH: Puppeteer Scraper (Only runs if Fast Path fails)
     let browserInstance = null;
     let page = null;
 
     try {
-        // 1. Check Cache first (Always!)
-        const cached = await getTitlesCache(url);
-        if (cached) return res.json({ title: cached, source: 'cache' });
-
-        // 2. Launch Browser
         browserInstance = await getBrowserInstance();
         page = await browserInstance.newPage();
+        
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
-        // 3. Block unnecessary junk to save time/memory
         await page.setRequestInterception(true);
         page.on('request', (req) => {
             if (['image', 'stylesheet', 'font', 'media', 'script'].includes(req.resourceType())) {
-                // We actually block scripts too if the title is in the HTML source
-                // This makes the page load INSTANTLY
                 req.abort();
             } else {
                 req.continue();
             }
         });
 
-        // 4. Navigate with a tight timeout
-        // 'domcontentloaded' is much faster than 'networkidle'
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 8000 });
 
         const rawTitle = await page.evaluate(() => {
-            // Amazon specific selector for the movie title
             const amzTitle = document.querySelector('h1[data-automation-id="title"]')?.innerText;
             const ogTitle = document.querySelector('meta[property="og:title"]')?.content;
             return amzTitle || ogTitle || document.title;
@@ -261,7 +292,7 @@ app.get('/api/scrape', async (req, res) => {
             await setTitlesCache(url, cleanTitle);
         }
 
-        res.json({ title: cleanTitle });
+        res.json({ title: cleanTitle, source: 'puppeteer' });
 
     } catch (error) {
         console.error("Scrape Crash:", error.message);
