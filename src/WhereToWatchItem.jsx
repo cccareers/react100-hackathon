@@ -9,7 +9,7 @@ const WhereToWatchItem = ({ item }) => {
 
     async function getTitle() {
       const url = item.link;
-      const endpoint = `http://localhost:3001/api/scrape?url=${encodeURIComponent(url)}`;
+      const endpoint = `/api/scrape?url=${encodeURIComponent(url)}`;
 
       try {
         const response = await fetch(endpoint);
