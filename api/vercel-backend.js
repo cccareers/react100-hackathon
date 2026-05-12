@@ -36,12 +36,12 @@ const cleanScrapedTitle = (title) =>
 
     // 1. Specific removals for common "junk" patterns
     let cleaned = title
-        .replace(/Amazon\.com: /i, '')
-        .replace(/\| Prime Video/i, '')
-        .replace(/\| Hulu/i, '')
-        .replace(/ - Apple TV/i, '')
-        .replace(/ - Netflix/i, '')
-        .replace(/\| Netflix/i, '');
+        .replaceAll(/Amazon\.com: /i, '')
+        .replaceAll(/\| Prime Video/i, '')
+        .replaceAll(/\| Hulu/i, '')
+        .replaceAll(/\| Netflix/i, '')
+        .replaceAll(/ - Apple TV/i, '')
+        .replaceAll(/ - Netflix/i, '');
 
     // 2. The "Smart Dash" removal
     // We only want to split and drop the second half if it's a known service name.
@@ -108,6 +108,12 @@ app.get('/api/streaming-info', async (req, res) =>
     if (url.includes('hulu.com/movie/'))
     {
         const slug = url.split('/movie/')[1];
+        const parts = slug.split('-');
+        extractedTitle = parts.slice(0, -5).join(' ');
+    }
+    else if (url.includes('hulu.com/series/'))
+    {
+        const slug = url.split('/series/')[1];
         const parts = slug.split('-');
         extractedTitle = parts.slice(0, -5).join(' ');
     }
