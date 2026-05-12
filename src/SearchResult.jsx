@@ -5,7 +5,7 @@ const SearchResult = ({ result, findWhereToWatch }) => (
     className="selectable-search-item"
     onClick={function (e) {
       e.preventDefault();
-      findWhereToWatch(result, "us");
+      findWhereToWatch(result);
       window.scrollTo(0, 0);
     }}>
     <div className="search-result-info">

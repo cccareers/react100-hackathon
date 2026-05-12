@@ -4,14 +4,14 @@ import axios from "axios";
 import SearchResultList from "./SearchResultList";
 import ConfigPanel from "./ConfigPanel";
 import WhereToWatchPanel from "./WhereToWatchPanel";
-import {get, set} from 'idb-keyval';
 
 const tmdbKey = import.meta.env.VITE_TMDB_API_KEY;
-const rapidapiKey = import.meta.env.VITE_STREAMING_AVAILABILITY_API_KEY;
-tmdbKey ? console.log("TMPD API key is loaded") : console.log("Failed TMDB API key loading");
-rapidapiKey ? console.log("Streaming Availability key is loaded") : console.log("Failed Streaming Availability key loading");
+tmdbKey
+  ? console.log("TMPD API key is loaded")
+  : console.log("Failed TMDB API key loading");
 
 function App() {
+  window.scrollTo(0, 0);
   //this userSubscriptions and useEffect section will save the user's
   // confirmed streaming services in local storage
   // so they don't have to re-enter their information
@@ -31,26 +31,7 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedResult, setSelectedResult] = useState();
   const [whereToWatch, setWhereToWatch] = useState([]);
-
- const [cache, setCache] = useState({});
- const [isLoaded, setIsLoaded] = useState(false);
-useEffect(() => {
-  const initCache = async () => {
-    const saved = await get('streamingCache');
-    if (saved) {
-      setCache(saved);
-    }
-    setIsLoaded(true);
-  };
-  initCache();
-}, []);
-useEffect(() => {
-  if (!isLoaded) return;
-  const saveToDb = async () => {
-    await set('streamingCache', cache);
-  };
-  saveToDb();
-}, [cache, isLoaded]);
+  const [selectedRegion, setSelectedRegion] = useState("us");
 
   function handleSearch() {
     const options = {
@@ -64,8 +45,7 @@ useEffect(() => {
       },
       headers: {
         accept: "application/json",
-        Authorization:
-          `Bearer ${tmdbKey}`,
+        Authorization: `Bearer ${tmdbKey}`,
       },
     };
 
@@ -89,42 +69,38 @@ useEffect(() => {
       .catch((err) => console.error(err));
   }
 
-  function findWhereToWatch(selectedItem, region) {
-    if (cache[selectedItem.id] && Date.now() - cache[selectedItem.id].timestamp < 86400000) {
-      console.log("retrieving from cache");
-      if(cache[selectedItem.id].data.service_name !== "unavailable") {
-        setSelectedResult(selectedItem);
-        setWhereToWatch(cache[selectedItem.id].data);
-        console.log("successfully retrieved from cache");
-      } else {
-        setSelectedResult(selectedItem);
-        setWhereToWatch([{ service_name: "unavailable" }]);
-        console.log(
-          "Media ID previously found, but no data returned. streaming info unavailable",
-        );
-      }
-    } else {
-      if(cache[selectedItem.id] && Date.now() - cache[selectedItem.id].timestamp > 86400000)
-        console.log("data is stale, refreshing");
-      else
-        console.log("data not in cache, querying Streaming Availability API");
+  async function getBackendStreamingData(type, id) {
+    const endpoint = `http://localhost:3001/api/streaming-info?media_type=${type}&tmdbId=${id}`;
 
-      const options = {
-        method: "GET",
-        url: `https://streaming-availability.p.rapidapi.com/shows/${selectedItem.media_type}/${selectedItem.id}`,
-        headers: {
-          "x-rapidapi-key":
-            rapidapiKey,
-          "x-rapidapi-host": "streaming-availability.p.rapidapi.com",
-          "Content-Type": "application/json",
-        },
-      };
+    try {
+      const response = await fetch(endpoint);
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error:", error);
+      return null;
+    }
+  }
 
-      axios
-        .request(options)
-        .then(function (res) {
-          setSelectedResult(selectedItem);
-          const foundData = res.data.streamingOptions[region].map((a) => ({
+  async function findWhereToWatch(selectedItem) {
+    setSelectedResult(selectedItem);
+    setWhereToWatch("loading");
+    const region = selectedRegion;
+    const streamingData = await getBackendStreamingData(
+      selectedItem.media_type,
+      selectedItem.id,
+    );
+    console.log("got this data on the frontend");
+    console.log(streamingData);
+
+    if (streamingData) {
+      if (streamingData.data != "unavailable") {
+        try {
+          console.log("getting streaming data for region: " + region);
+          const lastUpdate = new Date(streamingData.timestamp).toLocaleDateString();
+          console.log("Timestamp "+ lastUpdate);
+          const foundData = streamingData.data.streamingOptions[region].map(
+            (a) => ({
               service_name: a.service.name,
               subscription_type: a.type,
               link: a.link,
@@ -132,18 +108,22 @@ useEffect(() => {
               price: a.price?.formatted,
               logo: a.service.imageSet.darkThemeImage,
               addon: a.addon?.name,
-            }));
-          setCache(prev => ({...prev, [selectedItem.id]: {data: foundData, timestamp: Date.now()}}));
-          console.log("adding data to cache");
+              lastUpdated: lastUpdate,
+            }),
+          );
           setWhereToWatch(foundData);
-          console.log(res.data);
-        })
-        .catch(function (err) {
-          console.log("data not found, saving id in cache");
-          setCache(prev => ({...prev, [selectedItem.id]: {data: {service_name: "unavailable"}, timestamp: Date.now()}}));
-          setSelectedResult(selectedItem);
+          console.log("successfully retrieved data from backend request");
+        } catch {
+          console.log("data retrieved, but streaming info unavailable");
           setWhereToWatch([{ service_name: "unavailable" }]);
-        });
+        }
+      } else {
+        console.log("id in cache, but request from Streaming Availability api returned nothing");
+        setWhereToWatch([{ service_name: "unavailable" }]);
+      }
+    } else {
+      console.log("failed to get data from backend");
+      setWhereToWatch([{ service_name: "unavailable" }]);
     }
   }
 
@@ -160,6 +140,7 @@ useEffect(() => {
         <ConfigPanel
           userSubscriptions={userSubscriptions}
           handleSubscriptions={handleSubscriptions}
+          setRegion={setSelectedRegion}
         />
 
         <div className="search-panel">

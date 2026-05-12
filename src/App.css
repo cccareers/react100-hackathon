@@ -124,6 +124,27 @@ h1 {
   }
 }
 
+.region-div{
+  width: 100%;
+  margin-top: 2%;
+  padding: 2px;
+  padding-bottom: 6px;
+  font-size: 22px;
+  border-top-style: solid;
+  border-bottom-style: solid;
+  border-width: 2px;
+  border-color: rgb(0, 50, 63);
+}
+
+.region-select{
+  color: rgb(9, 38, 46);
+  background-color: rgba(211, 237, 255, 0.774);
+  font-size: 16px;
+  border-radius: 4px;
+  border-color: rgba(211, 237, 255, 0.774);
+  padding: 2px;
+}
+
 .configuration-panel {
   flex: 0.55;
   background-color: rgba(9, 38, 46, 0.308);
@@ -225,6 +246,10 @@ p {
   font-size: 160%;
 }
 
+.last-update{
+  color: rgba(167, 237, 250, 0.644);
+}
+
 .availability {
   color: rgba(2, 2, 2, 0.747);
 }
@@ -260,9 +285,16 @@ p {
   }
 }
 
+.link-title{
+  font-style: italic;
+  color: rgb(0, 1, 66);
+  text-decoration: underline;
+  margin-bottom: 2px;
+}
+
 .quality-tag {
   position: absolute;
-  top: 32%;
+  top: 24%;
   left: 0;
   padding: 6px;
   color: rgba(223, 223, 223, 0.877);
@@ -290,7 +322,7 @@ p {
 .purchaseable-items {
   padding: 4px;
   background-color: rgba(191, 192, 138, 0.555);
-  color: black;
+  color: rgb(0, 0, 0);
   margin: 4px;
   border-radius: 4px;
   border-width: 4px;
