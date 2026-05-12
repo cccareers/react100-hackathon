@@ -40,7 +40,8 @@ const cleanScrapedTitle = (title) =>
         .replace(/\| Prime Video/i, '')
         .replace(/\| Hulu/i, '')
         .replace(/ - Apple TV/i, '')
-        .replace(/ - Netflix/i, '');
+        .replace(/ - Netflix/i, '')
+        .replace(/\| Netflix/i, '');
 
     // 2. The "Smart Dash" removal
     // We only want to split and drop the second half if it's a known service name.
