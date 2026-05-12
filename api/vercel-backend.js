@@ -109,6 +109,49 @@ app.get('/api/streaming-info', async (req, res) =>
     const { media_type, tmdbId } = req.query;
     if (!tmdbId) return res.status(400).json({ error: 'tmdbId is required' });
 
+    let extractedTitle = null;
+
+    // --- FAST PATH: URL PARSING ---
+    if (url.includes('hulu.com/movie/'))
+    {
+        const slug = url.split('/movie/')[1];
+        const parts = slug.split('-');
+        extractedTitle = parts.slice(0, -5).join(' ');
+    }
+    else if (url.includes('tv.apple.com/') && url.includes('/movie/'))
+    {
+        // Split by /movie/, take the second part, then split by / to get the title slug
+        const slug = url.split('/movie/')[1].split('/')[0];
+        extractedTitle = slug.replace(/-/g, ' ');
+    }
+    else if (url.includes('crunchyroll.com/series/'))
+    {
+        // Example: /series/GZJH3DPK0/blade-runner-black-lotus
+        const parts = url.split('/series/')[1].split('/');
+        // parts[0] is the ID (GZJH3DPK0), parts[1] is the title slug
+        if (parts[1])
+        {
+            extractedTitle = parts[1].replace(/-/g, ' ');
+        } else
+        {
+            // Sometimes URLs don't have the slug at the end, just the ID
+            // In this case, we'll let it fall through to Puppeteer
+            extractedTitle = null;
+        }
+    }
+
+    // --- FORMAT & RETURN IF SUCCESSFUL ---
+    if (extractedTitle)
+    {
+        const cleanTitle = decodeURIComponent(extractedTitle)
+            .replace(/-/g, ' ') // Standardize dashes to spaces
+            // This regex finds the first letter of every word, even after ( or [
+            .replace(/(^\w|\s\w|[\(\[]\w)/g, m => m.toUpperCase());
+
+        console.log('🚀 Fast Path Success:', cleanTitle);
+        return res.json({ title: cleanTitle, source: 'url-parse' });
+    }
+
     try
     {
         const db = await connectToDatabase();
