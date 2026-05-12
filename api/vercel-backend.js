@@ -232,6 +232,11 @@ app.get('/api/scrape', async (req, res) =>
     let page;
     try
     {
+        // If browser is null or disconnected, launch it now
+        if (!browser || !browser.connected) {
+            console.log('🌐 Launching browser for this request...');
+            browser = await getBrowserInstance();
+        }
         page = await browser.newPage();
 
         // Optimizing headers to look more human
@@ -272,8 +277,9 @@ app.get('/api/scrape', async (req, res) =>
 
     } catch (error)
     {
-        console.error(`Error scraping ${url}:`, error.message);
-        res.status(500).json({ error: 'Scrape failed' });
+        console.error(`Error scraping ${url}:`, error);
+        browser = null;
+        res.status(500).json({ error: error.message });
     } finally
     {
         if (page)
