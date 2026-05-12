@@ -92,28 +92,18 @@ async function initBrowser()
     console.log('✅ Browser Ready');
 }
 
-// Start the browser, THEN start the server
-initBrowser().then(() =>
-{
-    app.listen(3001, () =>
-    {
-        console.log('Backend running at http://localhost:3001');
-    });
-}).catch(err =>
-{
-    console.error("Failed to launch browser:", err);
-});
-
 app.get('/api/streaming-info', async (req, res) =>
 {
     const { url, media_type, tmdbId } = req.query;
     if (!tmdbId) return res.status(400).json({ error: 'tmdbId is required' });
     if (!url)
-        console.log("No URL provided, skipping fast paths"):
+        console.log("No URL provided, skipping fast paths");
 
     let extractedTitle = null;
 
     // --- FAST PATH: URL PARSING ---
+    if(url)
+    {
     if (url.includes('hulu.com/movie/'))
     {
         const slug = url.split('/movie/')[1];
@@ -140,6 +130,7 @@ app.get('/api/streaming-info', async (req, res) =>
             // In this case, we'll let it fall through to Puppeteer
             extractedTitle = null;
         }
+    }
     }
 
     // --- FORMAT & RETURN IF SUCCESSFUL ---
