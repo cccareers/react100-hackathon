@@ -99,7 +99,7 @@ function WhereToWatchPanel({
             </div>
 
             <h3 className="wheretowatch-header">Where To Watch: </h3>
-            <p className="last-update">Data last updated {whereToWatch[0].lastUpdated}. If the info is out of date or a link's not working, try to reacquire</p>
+            <p className="last-update">Data last updated {whereToWatch[0].lastUpdated}</p>
             <div className="included-items">
               {included.length > 0 ? (
                 <div>Included with your subscriptions at: {included}</div>
