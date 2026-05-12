@@ -62,16 +62,27 @@ const cleanScrapedTitle = (title) =>
     return cleaned.trim();
 };
 
+let isLaunching = false;
 async function getBrowserInstance()
 {
-    // On Vercel, use the light chromium binary
-        return await puppeteer.launch({
-            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+    // If another request is already launching, wait a tiny bit
+    while (isLaunching) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    // On Vercel, we use the light chromium binary
+    isLaunching = true;
+    try {
+        const browser = await puppeteer.launch({
+            args: chromium.args,
             defaultViewport: chromium.defaultViewport,
             executablePath: await chromium.executablePath(),
             headless: chromium.headless,
-            ignoreHTTPSErrors: true,
         });
+        return browser;
+    } finally {
+        isLaunching = false;
+    }
 }
 
 async function initBrowser()
