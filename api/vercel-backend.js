@@ -216,7 +216,7 @@ const setTitlesCache = async (url, title) =>
 
 // --- THE SCRAPER ---
 app.get('/api/scrape', async (req, res) => {
-    const { url } = req.query;
+    const { url, media_type, tmdbId } = req.query;
     if (!url) return res.status(400).json({ error: 'URL is required' });
 
     // 1. Check MongoDB Cache first
